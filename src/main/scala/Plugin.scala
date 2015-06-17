@@ -8,6 +8,7 @@ import org.apache.log4j.BasicConfigurator
 import org.eclipse.xtend.core.XtendStandaloneSetup
 import sbt.plugins.JvmPlugin
 import java.io.CharArrayWriter
+import org.eclipse.xtext.xbase.compiler.JavaVersion
 
 object Plugin extends sbt.AutoPlugin {
 
@@ -24,6 +25,7 @@ object Plugin extends sbt.AutoPlugin {
     lazy val xtendVersion         = settingKey[String]("version of xtend libraries")
     lazy val xtendWatchSources    = settingKey[Boolean]("add xtend files to list of watched files")
     lazy val xtendLogOutput       = settingKey[Boolean]("print generated java code to console")
+    lazy val xtendJavaVersion     = settingKey[JavaVersion]("java source version")
   }
 
   import autoImport._
@@ -38,16 +40,20 @@ object Plugin extends sbt.AutoPlugin {
     xtendSource in conf <<= (sourceDirectory in conf)(_ / "xtend"),
     xtendOutputDirectory in conf <<= (sourceManaged in conf),
     xtendLogOutput := false,
+    xtendJavaVersion := JavaVersion.JAVA7,
     xtendCompile in conf := {
-      val classes = (classDirectory in conf).value
-      val cp = (dependencyClasspath in conf).value
-      val out = (xtendOutputDirectory in conf).value
-      val in = (xtendSource in conf).value
       val log = streams.value.log
+      val in = (xtendSource in conf).value
+      val out = (xtendOutputDirectory in conf).value
+      val cp = (dependencyClasspath in conf).value
+      val classes = (classDirectory in conf).value
+      val javaVersion = xtendJavaVersion.value
 
       if (in.exists) {
-        if(!compileXtend(out, in, cp.map(_.data), classes, log)) {
-          throw new Error("xtend compile fail")
+        val success = compileXtend(out, in, cp.map(_.data), classes, log, javaVersion)
+
+        if(!success) {
+          throw new Error("xtend compilation failed")
         }
         val javaFiles = (out ** "*.java" get)
         if (xtendLogOutput.value) {
@@ -75,12 +81,13 @@ object Plugin extends sbt.AutoPlugin {
     w
   }
 
-  private[sbtend] def compileXtend(out: File,in: File,cp: Seq[File], classes: File, log: Logger):Boolean = {
+  private[sbtend] def compileXtend(out: File, in: File, cp: Seq[File], classes: File, log: Logger, javaVersion: JavaVersion): Boolean = {
     val logger = createLogger()
     val injector = new XtendStandaloneSetup().createInjectorAndDoEMFRegistration
     val c = injector.getInstance(classOf[XtendBatchCompiler])
     c.setOutputPath(out.toString())
     c.setSourcePath(in.toString())
+    c.setJavaSourceVersion(javaVersion.getQualifier())
     c.setVerbose(true)
     c.setOutputWriter(new LoggerWriter(log))
     c.setClassPath(cp.map(_.getAbsolutePath).mkString(File.pathSeparator))

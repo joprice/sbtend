@@ -10,7 +10,7 @@ organization := "com.github.xuwei_k"
 
 description := "sbt xtend plugin"
 
-version := "0.1.6-SNAPSHOT"
+version := "0.1.6-1-SNAPSHOT"
 
 homepage := Some(url("https://github.com/xuwei-k/sbtend"))
 
